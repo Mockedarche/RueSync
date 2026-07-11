@@ -19,23 +19,31 @@ pub struct RueSyncConfig {
     pub state_folder: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum BackupLocation {
     Local,
     Lan,
     Wan,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NetworkConfigBackup {
+    pub address: String,
+    pub port: u16,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BackupConfig {
     pub name: String,
     pub enabled: bool,
     pub source_directory: String,
     pub destination_directory: String,
     pub local_lan_wan: BackupLocation,
+    pub network_information: NetworkConfigBackup,
     pub source_bandwidth_cap_in_bytes: u64,
     pub destination_bandwidth_cap_in_bytes: u64,
     pub backup_interval_in_seconds: u64,
+    pub task_active: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -84,11 +92,10 @@ fn load_config() -> Config {
     config
 }
 
-pub fn save_modified_config(config: Arc<RwLock<Config>>) {
-    let json = {
-        let cfg = config.read().unwrap();
-        serde_json::to_string_pretty(&*cfg).unwrap()
-    };
+pub fn save_modified_config(config: &Arc<RwLock<Config>>) {
+    let cfg = config.read().unwrap();
+
+    let json = serde_json::to_string_pretty(&*cfg).unwrap();
 
     fs::write("config.json", json).unwrap();
 }
