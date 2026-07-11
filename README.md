@@ -1,13 +1,11 @@
-NOT FUNCTIONAL 
-
 Early prototyping for a data backup software I'm working on
 
 Plans for what to work on (roughly in order)
 
-- Basic daemon and client foundation
-- basic local data backup
+- basic daemon and client foundation - Done
+- basic local data backup - Done
 - basic lan data backup
-- basic wan data backup
+- basic wan data backup 
 - CLI client with full functionality (up to that point)
 
 Things to have fully working before a "release"
