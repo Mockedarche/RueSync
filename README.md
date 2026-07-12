@@ -4,8 +4,8 @@ Plans for what to work on (roughly in order)
 
 - basic daemon and client foundation - Done
 - basic local data backup - Done
-- basic lan data backup
-- basic wan data backup 
+- basic lan data backup - Done
+- basic wan data backup - Needs testing
 - CLI client with full functionality (up to that point)
 
 Things to have fully working before a "release"
