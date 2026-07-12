@@ -18,7 +18,7 @@ pub struct FileInfo {
     pub hash: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileHash {
     pub path: String,
     pub hash: String,

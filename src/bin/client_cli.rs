@@ -4,6 +4,7 @@ use std::{
     io::{self, Read, Write},
     net::TcpStream,
 };
+use uuid::Uuid;
 
 use RueSync::{
     config_handler::{BackupConfig, BackupLocation, NetworkConfig, NetworkConfigBackup},
@@ -132,19 +133,23 @@ fn main() {
             };
             */
 
-            let mut backup_config = BackupConfig {
+            let id = Uuid::new_v4().to_string();
+
+            let backup_config = BackupConfig {
                 name: "test".to_string(),
+                unique_id: id,
+                source_of_backup: true,
                 enabled: true,
                 source_directory: "TEMP".to_string(),
                 destination_directory: "TEMP".to_string(),
-                local_lan_wan: BackupLocation::Local,
+                local_lan_wan: BackupLocation::Lan,
                 network_information: NetworkConfigBackup {
-                    address: "temp".to_string(),
-                    port: 55000,
+                    address: "TEMP".to_string(),
+                    port: 55001,
                 },
                 source_bandwidth_cap_in_bytes: u64::MAX,
-                destination_bandwidth_cap_in_bytes: 102400,
-                backup_interval_in_seconds: 1,
+                destination_bandwidth_cap_in_bytes: u64::MAX,
+                backup_interval_in_seconds: 2,
                 task_active: false,
             };
 

@@ -35,6 +35,8 @@ pub struct NetworkConfigBackup {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BackupConfig {
     pub name: String,
+    pub unique_id: String,
+    pub source_of_backup: bool,
     pub enabled: bool,
     pub source_directory: String,
     pub destination_directory: String,
