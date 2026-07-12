@@ -15,5 +15,6 @@ Things to have fully working before a "release"
 - end to end data encryption for non local data backup
 - data compression to reduce data usage
 - polish pass
-  
+
+  Note before any release a very major polish pass will be needed. Additionally to realistically release i'd need someone else to be using the software. So this software may stay in a unreleased fashion.
   
