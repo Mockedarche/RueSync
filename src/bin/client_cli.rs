@@ -142,14 +142,14 @@ fn main() {
                 enabled: true,
                 source_directory: "TEMP".to_string(),
                 destination_directory: "TEMP".to_string(),
-                local_lan_wan: BackupLocation::Lan,
+                local_lan_wan: BackupLocation::Local,
                 network_information: NetworkConfigBackup {
                     address: "TEMP".to_string(),
                     port: 55001,
                 },
                 source_bandwidth_cap_in_bytes: u64::MAX,
                 destination_bandwidth_cap_in_bytes: u64::MAX,
-                backup_interval_in_seconds: 2,
+                backup_interval_in_seconds: 1,
                 task_active: false,
             };
 
