@@ -1,5 +1,12 @@
 Early prototyping for a data backup software I'm working on
 
+
+Current Prototype of a local backup (with 1 second backup interval) fully functional local and lan backups
+
+[Screencast_20260829_110632.webm](https://github.com/user-attachments/assets/17c33798-f54a-403b-aaaf-16e3923ca74f)
+
+
+
 Plans for what to work on (roughly in order)
 
 - basic daemon and client foundation - Done
