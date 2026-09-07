@@ -13,7 +13,8 @@ Plans for what to work on (roughly in order)
 - basic local data backup - Done
 - basic lan data backup - Done
 - basic wan data backup - Needs testing
-- CLI client with full functionality (up to that point)
+- CLI client with full functionality (up to that point) - currently working on
+- local host web server - currently working on
 
 Things to have fully working before a "release"
 
@@ -24,4 +25,18 @@ Things to have fully working before a "release"
 - polish pass
 
   Note before any release a very major polish pass will be needed. Additionally to realistically release i'd need someone else to be using the software. So this software may stay in a unreleased fashion.
+
+Future plans are ambitious
+  
+- Drop box behavior
+- placeholder files demonstrating a backups contents
+- Desktop app
+- Mirrored backups (multiple destinations) with torrent style peer file sharing for performance
+
+In short i'd like this software to become techies one stop shop for data backups by having it be feature rich, support extensive configuration, and to also be incredibly user friendly.
+
+web server prototype 
+![](https://github.com/Mockedarche/RueSync/blob/main/media/web%20server%20example.png?raw=true)
+    
+     
   
