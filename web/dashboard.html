@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>RueSync Dashboard</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 0 20px;
+            background: #f5f5f5;
+        }
+
+        h1 {
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+        }
+
+        .status {
+            font-weight: bold;
+        }
+
+        .enabled {
+            color: green;
+        }
+
+        .disabled {
+            color: red;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>RueSync Dashboard</h1>
+
+    <!-- Components Running -->
+    <div class="card">
+        <h2>Components Running</h2>
+
+        <p>
+            web_server_active =
+            <span id="web-server-status" class="status disabled">
+                Not Running
+            </span>
+        </p>
+
+        <p>
+            daemon_active =
+            <span id="daemon-status" class="status disabled">
+                Not Running
+            </span>
+        </p>
+
+        <p>
+            tcp_server_active =
+            <span id="tcp-server-status" class="status disabled">
+                Not Running
+            </span>
+        </p>
+    </div>
+
+    <!-- Backups -->
+    <div class="card">
+        <h2>Backups</h2>
+
+        <div id="backups">
+            {{BACKUPS}}
+        </div>
+    </div>
+
+    <!-- Current Activity -->
+    <div class="card">
+        <h2>Current Activity</h2>
+
+        <div id="current-activity">
+            <p>No backup currently running.</p>
+        </div>
+    </div>
+
+    <script>
+        async function updateDashboard() {
+            try {
+                const response = await fetch("/api/runtime", {
+                    cache: "no-store"
+                });
+
+                if (!response.ok) {
+                    throw new Error("Failed to get runtime state");
+                }
+
+                const runtime = await response.json();
+
+                updateComponents(runtime);
+                updateBackups(runtime);
+                updateCurrentActivity(runtime);
+
+            } catch (error) {
+                console.error("Failed to update dashboard:", error);
+            }
+        }
+
+
+        function updateComponents(runtime) {
+            updateComponent(
+                "web-server-status",
+                runtime.web_server_active
+            );
+
+            updateComponent(
+                "daemon-status",
+                runtime.daemon_active
+            );
+
+            updateComponent(
+                "tcp-server-status",
+                runtime.tcp_server_active
+            );
+        }
+
+
+        function updateComponent(elementId, running) {
+            const element = document.getElementById(elementId);
+
+            if (running) {
+                element.textContent = "Running";
+                element.className = "status enabled";
+            } else {
+                element.textContent = "Not Running";
+                element.className = "status disabled";
+            }
+        }
+
+
+        function updateBackups(runtime) {
+            const backups = document.querySelectorAll("[data-backup-id]");
+
+            backups.forEach(card => {
+                const id = card.dataset.backupId;
+                const info = runtime.backups[id];
+
+                if (!info) {
+                    return;
+                }
+
+                const status = card.querySelector(".runtime-status");
+
+                if (status) {
+                    status.textContent = info.status;
+
+                    status.className = "status runtime-status";
+
+                    if (info.status === "Running") {
+                        status.classList.add("enabled");
+                    } else if (info.status === "Error") {
+                        status.classList.add("disabled");
+                    } else if (info.status === "Success") {
+                        status.classList.add("enabled");
+                    }
+                }
+            });
+        }
+
+
+        function updateCurrentActivity(runtime) {
+            const activity = document.getElementById("current-activity");
+
+            const runningBackups = Object.values(runtime.backups)
+                .filter(info => info.is_running);
+
+            if (runningBackups.length === 0) {
+                activity.innerHTML =
+                    "<p>No backup currently running.</p>";
+
+                return;
+            }
+
+            activity.innerHTML = runningBackups
+                .map(info => {
+                    const operation =
+                        info.current_operation ||
+                        "Running";
+
+                    return `
+                        <p>
+                            <strong>${info.name}</strong>
+                            - ${operation}
+                        </p>
+                    `;
+                })
+                .join("");
+        }
+
+
+        // Update immediately when the page loads.
+        updateDashboard();
+
+        // Update every 5 seconds.
+        setInterval(updateDashboard, 1000);
+    </script>
+
+</body>
+</html>

@@ -6,7 +6,7 @@ use std::{
     path::Path,
     sync::{Arc, RwLock},
     thread,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime},
 };
 
 use crate::{
@@ -14,6 +14,7 @@ use crate::{
     config_handler::{BackupConfig, BackupLocation, Config},
     recheck_directory::{self, FileHash},
     requests::Request,
+    runtime_state::{BackupRuntimeInfo, BackupStatus, SharedRuntimeState},
 };
 
 type SharedConfig = Arc<RwLock<Config>>;
@@ -21,7 +22,7 @@ type SharedConfig = Arc<RwLock<Config>>;
 #[derive(Debug, Eq, PartialEq)]
 pub struct BackupTask {
     pub run_at: Instant,
-    pub backup_index: usize,
+    pub backup_id: String,
 }
 
 impl Ord for BackupTask {
@@ -36,33 +37,31 @@ impl PartialOrd for BackupTask {
     }
 }
 
-pub fn start(config: SharedConfig) -> thread::JoinHandle<()> {
+pub fn start(config: SharedConfig, runtime_state: SharedRuntimeState) -> thread::JoinHandle<()> {
     thread::spawn(move || {
-        run(config);
+        run(config, runtime_state);
     })
 }
 
-fn run(config: SharedConfig) {
+fn run(config: SharedConfig, runtime_state: SharedRuntimeState) {
     println!("RueSync backup daemon started");
 
     let mut tasks: BinaryHeap<BackupTask> = BinaryHeap::new();
 
+    // Add existing backups to the task queue.
     {
         let mut cfg = config.write().unwrap();
 
-        for index in 0..cfg.backups.len() {
-            if !cfg.backups[index].task_active
-                && cfg.backups[index].enabled
-                && cfg.backups[index].source_of_backup
-            {
+        for backup in cfg.backups.iter_mut() {
+            if !backup.task_active && backup.enabled && backup.source_of_backup {
                 tasks.push(BackupTask {
                     run_at: Instant::now(),
-                    backup_index: index,
+                    backup_id: backup.unique_id.clone(),
                 });
 
-                cfg.backups[index].task_active = true;
+                backup.task_active = true;
 
-                println!("Added backup {} to tasks", cfg.backups[index].name);
+                println!("Added backup {} to tasks", backup.name);
             }
         }
     }
@@ -70,39 +69,51 @@ fn run(config: SharedConfig) {
     loop {
         if let Some(task) = tasks.peek() {
             if task.run_at <= Instant::now() {
+                let backup_id = task.backup_id.clone();
+
+                // Look up the backup by unique ID rather than vector index.
                 let current_backup_config = {
                     let cfg = config.read().unwrap();
 
-                    if task.backup_index >= cfg.backups.len() {
-                        tasks.pop();
-                        continue;
-                    }
-
-                    cfg.backups[task.backup_index].clone()
+                    cfg.backups
+                        .iter()
+                        .find(|backup| backup.unique_id == backup_id)
+                        .cloned()
                 };
 
-                run_backup(&current_backup_config);
-
-                let current_backup_index = task.backup_index;
-
+                // Remove the current task regardless.
                 tasks.pop();
 
-                tasks.push(BackupTask {
-                    run_at: Instant::now()
-                        + Duration::from_secs(current_backup_config.backup_interval_in_seconds),
-                    backup_index: current_backup_index,
-                });
+                match current_backup_config {
+                    Some(backup) => {
+                        run_backup(&backup, &runtime_state);
+
+                        // Only reschedule if it still exists and is enabled.
+                        if backup.enabled && backup.source_of_backup {
+                            tasks.push(BackupTask {
+                                run_at: Instant::now()
+                                    + Duration::from_secs(backup.backup_interval_in_seconds),
+                                backup_id: backup.unique_id.clone(),
+                            });
+                        }
+                    }
+
+                    None => {
+                        println!("Backup {} no longer exists, removing task", backup_id);
+                    }
+                }
             }
         }
 
+        // Check for newly added backups.
         {
             let mut cfg = config.write().unwrap();
 
-            for (index, backup) in cfg.backups.iter_mut().enumerate() {
+            for backup in cfg.backups.iter_mut() {
                 if !backup.task_active && backup.enabled && backup.source_of_backup {
                     tasks.push(BackupTask {
                         run_at: Instant::now(),
-                        backup_index: index,
+                        backup_id: backup.unique_id.clone(),
                     });
 
                     backup.task_active = true;
@@ -116,16 +127,59 @@ fn run(config: SharedConfig) {
     }
 }
 
-fn run_backup(backup: &BackupConfig) {
+fn run_backup(backup: &BackupConfig, runtime_state: &SharedRuntimeState) {
     if !backup.enabled {
         return;
+    }
+
+    // Mark backup as currently running.
+    {
+        let mut state = runtime_state.write().unwrap();
+
+        state.backups.insert(
+            backup.unique_id.clone(),
+            BackupRuntimeInfo {
+                unique_id: backup.unique_id.clone(),
+                name: backup.name.clone(),
+                is_running: true,
+                status: BackupStatus::Running,
+                current_operation: Some("Starting backup".to_string()),
+                last_error: None,
+                last_backup: None,
+                next_backup: None,
+            },
+        );
     }
 
     let backup_path = Path::new(&backup.source_directory);
 
     if !backup_path.exists() || !backup_path.is_dir() {
-        eprintln!("Backup source directory does not exist for {}", backup.name);
+        let error = format!(
+            "Backup source directory does not exist: {}",
+            backup.source_directory
+        );
+
+        eprintln!("{}", error);
+
+        let mut state = runtime_state.write().unwrap();
+
+        if let Some(info) = state.backups.get_mut(&backup.unique_id) {
+            info.status = BackupStatus::Error;
+            info.is_running = false;
+            info.current_operation = None;
+            info.last_error = Some(error);
+        }
+
         return;
+    }
+
+    // Update current operation.
+    {
+        let mut state = runtime_state.write().unwrap();
+
+        if let Some(info) = state.backups.get_mut(&backup.unique_id) {
+            info.current_operation = Some("Checking source files".to_string());
+        }
     }
 
     let backup_state = match recheck_directory::get_directory_state(backup_path, Path::new("state"))
@@ -133,10 +187,31 @@ fn run_backup(backup: &BackupConfig) {
         Ok(state) => state,
 
         Err(e) => {
-            eprintln!("Failed to get backup state for {}: {:?}", backup.name, e);
+            let error = format!("Failed to get backup state for {}: {:?}", backup.name, e);
+
+            eprintln!("{}", error);
+
+            let mut state = runtime_state.write().unwrap();
+
+            if let Some(info) = state.backups.get_mut(&backup.unique_id) {
+                info.status = BackupStatus::Error;
+                info.is_running = false;
+                info.current_operation = None;
+                info.last_error = Some(error);
+            }
+
             return;
         }
     };
+
+    // Update current operation.
+    {
+        let mut state = runtime_state.write().unwrap();
+
+        if let Some(info) = state.backups.get_mut(&backup.unique_id) {
+            info.current_operation = Some("Performing backup".to_string());
+        }
+    }
 
     match backup.local_lan_wan {
         BackupLocation::Local => {
@@ -146,6 +221,17 @@ fn run_backup(backup: &BackupConfig) {
         BackupLocation::Lan | BackupLocation::Wan => {
             run_remote_backup(backup, backup_state);
         }
+    }
+
+    // Update final runtime status.
+    let mut state = runtime_state.write().unwrap();
+
+    if let Some(info) = state.backups.get_mut(&backup.unique_id) {
+        info.status = BackupStatus::Success;
+        info.is_running = false;
+        info.current_operation = None;
+        info.last_backup = Some(SystemTime::now());
+        info.last_error = None;
     }
 }
 

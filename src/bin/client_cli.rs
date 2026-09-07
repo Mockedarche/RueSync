@@ -147,7 +147,7 @@ fn main() {
                     address: "TEMP".to_string(),
                     port: 55001,
                 },
-                source_bandwidth_cap_in_bytes: u64::MAX,
+                source_bandwidth_cap_in_bytes: 1024000,
                 destination_bandwidth_cap_in_bytes: u64::MAX,
                 backup_interval_in_seconds: 1,
                 task_active: false,

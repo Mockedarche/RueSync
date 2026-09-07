@@ -1,9 +1,10 @@
-use std::{
-    fs,
-    sync::{Arc, RwLock},
-};
+use std::sync::{Arc, RwLock};
 
-use RueSync::{backup_daemon, config_handler, tcp_server};
+use RueSync::{
+    backup_daemon, config_handler,
+    runtime_state::{RuntimeState, SharedRuntimeState},
+    tcp_server, web_server,
+};
 
 type SharedConfig = Arc<RwLock<config_handler::Config>>;
 
@@ -12,7 +13,7 @@ fn main() {
 
     let args: Vec<String> = std::env::args().skip(1).collect();
 
-    // --reset must be the only argument.
+    // Handle reset immediately and exit.
     if args.contains(&"--reset".to_string()) {
         if args.len() != 1 {
             eprintln!("Error: --reset cannot be combined with other arguments.");
@@ -39,22 +40,32 @@ fn main() {
 
     let config: SharedConfig = Arc::new(RwLock::new(config_handler::init()));
 
-    println!("Config loaded");
+    let runtime_state: SharedRuntimeState = Arc::new(RwLock::new(RuntimeState::default()));
 
     if run_tcp {
+        {
+            let mut state = runtime_state.write().unwrap();
+            state.tcp_server_active = true;
+        }
         tcp_server::start(Arc::clone(&config));
     }
 
     if run_web {
-        // web_server::start(Arc::clone(&config));
+        {
+            let mut state = runtime_state.write().unwrap();
+            state.web_server_active = true;
+        }
+        web_server::start(Arc::clone(&config), Arc::clone(&runtime_state));
     }
 
     if run_daemon {
-        backup_daemon::start(Arc::clone(&config));
+        {
+            let mut state = runtime_state.write().unwrap();
+            state.daemon_active = true;
+        }
+        backup_daemon::start(Arc::clone(&config), Arc::clone(&runtime_state));
     }
 
-    // Keep the process alive while the requested
-    // components are running.
     loop {
         std::thread::park();
     }
