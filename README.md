@@ -15,6 +15,7 @@ Plans for what to work on (roughly in order)
 - basic wan data backup - Needs testing
 - CLI client with full functionality (up to that point) - currently working on
 - local host web server - currently working on
+- relative paths for backups (you set a folder that all backups are based from)
 
 Things to have fully working before a "release"
 
